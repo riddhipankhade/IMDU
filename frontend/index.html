@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IMDU — Document Understanding</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f1117;
+      color: #e8eaf6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+    header h1 span { color: #7c6ef2; }
+    header p {
+      margin-top: 0.4rem;
+      color: #9ca3af;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3e;
+      border-radius: 14px;
+      padding: 1.6rem;
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 1.2rem;
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #c7c9d9;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Upload zone */
+    #drop-zone {
+      border: 2px dashed #3a3d52;
+      border-radius: 10px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: #7c6ef2;
+      background: rgba(124, 110, 242, 0.06);
+    }
+    #drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    #drop-zone .icon { font-size: 2.4rem; margin-bottom: 0.5rem; }
+    #drop-zone p { color: #9ca3af; font-size: 0.9rem; }
+    #drop-zone strong { color: #e8eaf6; }
+
+    /* Status bar */
+    #status-bar {
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+    #status-bar.processing { background: rgba(250, 189, 0, 0.1); color: #fabd00; border: 1px solid rgba(250, 189, 0, 0.2); }
+    #status-bar.ready      { background: rgba(52, 211, 153, 0.1); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.2); }
+    #status-bar.error      { background: rgba(239, 68, 68, 0.1);  color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Metadata chips */
+    #metadata { display: none; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+    .chip {
+      background: #252838;
+      border: 1px solid #3a3d52;
+      border-radius: 20px;
+      padding: 0.3rem 0.8rem;
+      font-size: 0.8rem;
+      color: #b0b3c6;
+    }
+    .chip strong { color: #7c6ef2; }
+
+    /* Q&A section */
+    #qa-section { display: none; }
+
+    .input-row {
+      display: flex;
+      gap: 0.6rem;
+    }
+    #question-input {
+      flex: 1;
+      background: #12141f;
+      border: 1px solid #2a2d3e;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: #e8eaf6;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #question-input:focus { border-color: #7c6ef2; }
+    #question-input::placeholder { color: #5a5d72; }
+
+    button {
+      background: #7c6ef2;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1.2rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+      white-space: nowrap;
+    }
+    button:hover { background: #6a5de0; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Answer */
+    #answer-box { display: none; margin-top: 1.2rem; }
+    #answer-box h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #7c6ef2;
+      margin-bottom: 0.6rem;
+    }
+    #answer-text {
+      background: #12141f;
+      border: 1px solid #2a2d3e;
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: #e8eaf6;
+      white-space: pre-wrap;
+    }
+
+    /* Sources */
+    #sources-box { display: none; margin-top: 1rem; }
+    #sources-box summary {
+      cursor: pointer;
+      color: #9ca3af;
+      font-size: 0.85rem;
+      user-select: none;
+    }
+    #sources-box summary:hover { color: #e8eaf6; }
+    .source-chunk {
+      margin-top: 0.75rem;
+      background: #12141f;
+      border-left: 3px solid #7c6ef2;
+      border-radius: 0 6px 6px 0;
+      padding: 0.6rem 0.8rem;
+    }
+    .source-chunk .meta {
+      font-size: 0.75rem;
+      color: #7c6ef2;
+      margin-bottom: 0.3rem;
+    }
+    .source-chunk .snippet {
+      font-size: 0.85rem;
+      color: #9ca3af;
+      line-height: 1.5;
+    }
+
+    footer {
+      margin-top: 2rem;
+      color: #4a4d60;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>IMDU <span>✦</span></h1>
+    <p>Intelligent Multilingual Document Understanding</p>
+  </header>
+
+  <!-- Upload Card -->
+  <div class="card">
+    <h2>📄 Upload Document</h2>
+    <div id="drop-zone">
+      <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp,.webp" />
+      <div class="icon">⬆️</div>
+      <p><strong>Click to upload</strong> or drag & drop</p>
+      <p>PDF, PNG, JPG, TIFF, BMP, WEBP</p>
+    </div>
+
+    <div id="status-bar">
+      <span id="status-spinner" class="spinner" style="display:none"></span>
+      <span id="status-text"></span>
+    </div>
+
+    <div id="metadata"></div>
+  </div>
+
+  <!-- Q&A Card -->
+  <div class="card" id="qa-section">
+    <h2>💬 Ask a Question</h2>
+    <div class="input-row">
+      <input
+        type="text"
+        id="question-input"
+        placeholder="e.g. What is the main conclusion of this document?"
+      />
+      <button id="ask-btn" onclick="askQuestion()">Ask</button>
+    </div>
+
+    <div id="answer-box">
+      <h3>Answer</h3>
+      <div id="answer-text"></div>
+    </div>
+
+    <details id="sources-box">
+      <summary>View source chunks used</summary>
+      <div id="sources-list"></div>
+    </details>
+  </div>
+
+  <footer>IMDU MVP · Powered by Gemini + PaddleOCR + FAISS</footer>
+
+  <script>
+    const API = "http://localhost:8000";
+
+    // ── File Upload ─────────────────────────────────────────────────────────
+    const dropZone = document.getElementById("drop-zone");
+    const fileInput = document.getElementById("file-input");
+
+    dropZone.addEventListener("dragover", e => {
+      e.preventDefault();
+      dropZone.classList.add("drag-over");
+    });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault();
+      dropZone.classList.remove("drag-over");
+      const f = e.dataTransfer.files[0];
+      if (f) uploadFile(f);
+    });
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files[0]) uploadFile(fileInput.files[0]);
+    });
+
+    function setStatus(type, message, showSpinner = false) {
+      const bar = document.getElementById("status-bar");
+      bar.className = type;
+      bar.style.display = "flex";
+      document.getElementById("status-spinner").style.display = showSpinner ? "block" : "none";
+      document.getElementById("status-text").textContent = message;
+    }
+
+    function showMetadata(meta, docType, chunks) {
+      const el = document.getElementById("metadata");
+      el.style.display = "flex";
+      el.innerHTML = `
+        <div class="chip"><strong>Type:</strong> ${docType}</div>
+        <div class="chip"><strong>Doc:</strong> ${meta.document_type || "—"}</div>
+        <div class="chip"><strong>Lang:</strong> ${meta.language || "—"}</div>
+        <div class="chip"><strong>Pages:</strong> ${meta.pages || "—"}</div>
+        <div class="chip"><strong>Chunks:</strong> ${chunks}</div>
+      `;
+    }
+
+    async function uploadFile(file) {
+      setStatus("processing", `Processing "${file.name}" …`, true);
+      document.getElementById("metadata").style.display = "none";
+      document.getElementById("qa-section").style.display = "none";
+      document.getElementById("answer-box").style.display = "none";
+      document.getElementById("sources-box").style.display = "none";
+
+      const form = new FormData();
+      form.append("file", file);
+
+      try {
+        const res = await fetch(`${API}/upload`, { method: "POST", body: form });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.detail || "Upload failed");
+
+        setStatus("ready", `✓ Ready — ${data.chunk_count} chunks indexed`);
+        showMetadata(data.metadata, data.document_type, data.chunk_count);
+        document.getElementById("qa-section").style.display = "block";
+
+      } catch (err) {
+        setStatus("error", `✗ Error: ${err.message}`);
+      }
+    }
+
+    // ── Question Answering ──────────────────────────────────────────────────
+    async function askQuestion() {
+      const input = document.getElementById("question-input");
+      const question = input.value.trim();
+      if (!question) return;
+
+      const btn = document.getElementById("ask-btn");
+      btn.disabled = true;
+      btn.textContent = "Thinking…";
+
+      document.getElementById("answer-box").style.display = "none";
+      document.getElementById("sources-box").style.display = "none";
+
+      try {
+        const res = await fetch(`${API}/ask`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Query failed");
+
+        document.getElementById("answer-text").textContent = data.answer;
+        document.getElementById("answer-box").style.display = "block";
+
+        // Show source chunks
+        const sourcesList = document.getElementById("sources-list");
+        sourcesList.innerHTML = data.source_chunks.map(chunk => `
+          <div class="source-chunk">
+            <div class="meta">Page ${chunk.page} · ${chunk.type}</div>
+            <div class="snippet">${escapeHtml(chunk.text.substring(0, 300))}${chunk.text.length > 300 ? "…" : ""}</div>
+          </div>
+        `).join("");
+        document.getElementById("sources-box").style.display = "block";
+
+      } catch (err) {
+        document.getElementById("answer-text").textContent = `Error: ${err.message}`;
+        document.getElementById("answer-box").style.display = "block";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Ask";
+      }
+    }
+
+    // Allow pressing Enter to ask
+    document.getElementById("question-input").addEventListener("keydown", e => {
+      if (e.key === "Enter") askQuestion();
+    });
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>
