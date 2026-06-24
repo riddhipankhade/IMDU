@@ -25,9 +25,9 @@ import google.generativeai as genai
 load_dotenv()
 
 # ── Gemini setup ────────────────────────────────────────────────────────────
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("GeminiAPIKey")
 if not api_key:
-    raise ValueError("GEMINI_API_KEY not found in .env file")
+    raise ValueError("GeminiAPIKey not found in .env file")
 
 genai.configure(api_key=api_key)
 _llm = genai.GenerativeModel("gemini-2.5-flash")
